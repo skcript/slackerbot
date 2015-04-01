@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "colors": "^1.0.3",
+    "slack-client": "^1.4.0"
+  }
+}
