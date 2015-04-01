@@ -3,66 +3,115 @@ Slack = require('slack-client')
 slack = new Slack(require('./authToken.coffee'), true, true)
 
 
-# bot config
-channelWhitelist = ['#slackerbots-crib']
-signoffMessage = ':parkingduck:'
+# static config
+defaultGridSize = 5 #must be < 10 and > 4
+defaultMatchSize = 4 #must be < gridSize and > 1
+allowedChannel = '#slackerbots-crib'
+signoffMessage = ':sunglasses:'
+winningEmote = ':astonished:'
 trigger =
-    startGame: /^(slack off with )(\S+)$/
+    startGame: /^slack off with (\S+)( size ([1-9]([0-9])?) match ([1-9]([0-9])?))?$/
     acceptWord: 'yes'
-    abortWord: 'slackerbot abort'
 tiles =
     empty: ':black_medium_small_square:'
+    winning: ':sunny:'
     player1: ':red_circle:'
     player2: ':large_blue_circle:'
+    numbers: [
+        ':one:'
+        ':two:'
+        ':three:'
+        ':four:'
+        ':five:'
+        ':six:'
+        ':seven:'
+        ':eight:'
+        ':nine:'
+        ':keycap_ten:'
+    ]
 
 # bot state
+columnHeaders = ''
 gameInProgress = false
 playerTwoTurn = false
 winner = ''
 players =
-    one: 'wgodfrey'
-    two: '2'
+    one: ''
+    two: ''
 gameGrid = []
 pendingRequests = {}
+gridSize = 0
+matchSize = 0
 
 # utility functions
+generateColumnNumbers = ->
+    columnHeaders = ''
+    i = 0
+    while (i <= gridSize - 1)
+        columnHeaders += tiles.numbers[i]
+        i++
 getCurrentPlayerName = ->
     if playerTwoTurn then players.two else players.one
 getCurrentPlayerTile = ->
     if playerTwoTurn then tiles.player2 else tiles.player1
-addRequest = (opponentName, userName) ->
-    pendingRequests[opponentName] = userName
+addRequest = (opponentName, userName, grid, match) ->
+    pendingRequests[opponentName] =
+        userName: userName
+        gridSize: grid
+        matchSize: match
 resetRequests = ->
     pendingRequests = {}
-gridSize = 8
-matchSize = 4
-resetGameGrid = ->
+startGame = (channel, player1, player2) ->
+    gameInProgress = true
+    players.one = player1
+    players.two = player2
+
+    resetGameGrid()
+    generateColumnNumbers()
+    resetRequests()
+    printGameGrid(channel)
+endGame = ->
+    gameInProgress = false
+    playerTwoTurn = false
+    players.one = ''
+    players.two = ''
+    winner = ''
+    gridSize = 0
+    matchSize = 0
+
+resetGameGrid = =>
     gameGrid = []
     x = 0
     y = 0
     while y < gridSize
-        gameGrid[y] ?= []
+        gameGrid[y] = []
         x = 0
         while x < gridSize
-            gameGrid[y][x] ?=
+            gameGrid[y][x] =
                 owner: ''
+                winningTile: false
             x++
         y++
+
 printGameGrid = (channel) ->
     if winner isnt ''
         loser = if winner is players.one then players.two else players.one
         response = "
             Game over!\n
-            @#{winner} slacks better than @#{loser}! :awesomebatman:\n
+            @#{winner} is a bigger slacker than @#{loser}! #{winningEmote}\n
         "
     else
-        response = "#{getCurrentPlayerTile()}
-                    It's @#{getCurrentPlayerName()}'s turn\n"
+        response = "
+                    #{getCurrentPlayerTile()}
+                    It's @#{getCurrentPlayerName()}'s turn.\n
+                   "
 
-    response += ':one::two::three::four::five::six::seven::eight:\n'
+    response += "#{columnHeaders}\n"
     for y, row of gameGrid
         for x, tile of row
-            if tile.owner is players.one
+            if tile.winningTile
+                response += tiles.winning
+            else if tile.owner is players.one
                 response += tiles.player1
             else if tile.owner is players.two
                 response += tiles.player2
@@ -74,89 +123,94 @@ updateGame = (channel, userName, col) ->
 
     if userName? and col? and userName is getCurrentPlayerName()
 
-        column = parseInt(col)
-        if column.toString() is col and column >= 1 and column <= gridSize
+        column = parseInt(col) - 1
+        if parseInt(col).toString() is col and column >= 0 and column <= gridSize - 1
 
-            lastRow = null
+            lastCoords = null
             i = 0
 
-            checkForWinner = ->
+            checkForWinner = (x, y) ->
 
-                for y, row of gameGrid
-                    for x, item of row
-                        if item.owner isnt ''
-                            x = parseInt(x, 10)
-                            y = parseInt(y, 10)
-                            owner = item.owner
+                x = parseInt(x, 10)
+                y = parseInt(y, 10)
+                owner = userName
 
-                            # mod[0] is the x modifier, mod[1] is the y modifier
-                            # this checks only 4 of the 8 possible angles for max efficiency
-                            for mod in [[1, -1]]
-                                xx = x + (matchSize - 1) * mod[0]
-                                minX = Math.min(x, xx)
-                                maxX = Math.max(x, xx)
-                                yy = y + (matchSize - 1) * mod[1]
-                                minY = Math.min(y, yy)
-                                maxY = Math.max(y, yy)
+                # mod[0] is the x modifier, mod[1] is the y modifier
+                # each mod makes the algorithm check a different direction
+                for mod in [[1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1]]#
+                    xx = x + ((matchSize - 1) * mod[0])
+                    minX = Math.min(x, xx)
+                    maxX = Math.max(x, xx)
 
+                    yy = y + ((matchSize - 1) * mod[1])
+                    minY = Math.min(y, yy)
+                    maxY = Math.max(y, yy)
 
+                    # if we're not going to fall over the edge
+                    if (
+                        maxX <= gridSize - 1 and
+                        minX >= 0 and
+                        maxY <= gridSize - 1 and
+                        minY >= 0
+                    )
+                        console.error 'mod>', mod
+                        # check if we've got a winner
+                        _x = x
+                        _y = y
+                        targetIterations = matchSize
+                        count = 0
+                        tileRefs = []
+                        while (targetIterations > 0)
+                            console.error 'checking', _x, _y
+                            if gameGrid[_y][_x].owner is owner
+                                console.error '\tyep'
+                                count++
+                                tileRefs.push(gameGrid[_y][_x])
+                            _x += mod[0]
+                            _y += mod[1]
+                            targetIterations--
 
-#                                if (
-#                                    lastX <= gridSize - 1 and
-#                                    lastX >= 0 and
-#                                    lastY <= gridSize - 1 and
-#                                    lastY >= 0
-#                                )
-#                                    (y - matchSize + 1) >= 0
-#                                    count = 0
-#                                    ii = 1
-#                                    while ii <= matchSize - 1
-#                                        if gameGrid[y - ii][x + ii].owner is owner
-#                                            count++
-#                                        ii++
-#                                    console.log count
-#                                    if count is matchSize - 1
-#                                        winner = owner
+                        console.error '===='
+                        # if we've got a winner
+                        if count is matchSize
+                            winner = owner
+                            for tile in tileRefs
+                                tile.winningTile = true;
 
             endTurn = ->
+                checkForWinner(lastCoords.x, lastCoords.y)
                 playerTwoTurn = !playerTwoTurn
-
-                checkForWinner()
-
-                cache = players.one
-                players.one = players.two
-                players.two = cache
-
-
                 printGameGrid(channel)
                 channel.send signoffMessage
 
+                if winner isnt ''
+                    endGame()
 
             addPiece = ->
                 i = gameGrid.length + 1
-                if lastRow? # don't do anything if the column is full
-                    lastRow[column - 1].owner = userName
+                if lastCoords? # don't do anything if the column is full
+                    gameGrid[lastCoords.y][lastCoords.x].owner = userName
                     endTurn()
 
             while i <= gameGrid.length
                 row = gameGrid[i]
 
                 if row?
-                    item = row[column - 1]
-                    if item.owner isnt '' #
+                    item = row[column]
+                    if item.owner isnt ''
                         addPiece()
                     else
-                        lastRow = row
+                        lastCoords =
+                            x: column
+                            y: i
 
                 else # we've fallen off the bottom
                     addPiece()
-
                 i++
 
 
 
 slack.on 'open', ->
-    resetGameGrid()
     console.log "@#{slack.self.name}".magenta.bold, "is all logged in at".cyan.bold, "#{slack.team.name}.slack.com".magenta.bold
 
 slack.on 'message', (message) ->
@@ -170,81 +224,126 @@ slack.on 'message', (message) ->
 
     userName = if user?.name? then "#{user.name}" else "UNKNOWN_USER"
 
+    if userName isnt slack.self.name
 
-    console.log "Received:".cyan.bold,
-        "#{type} #{channelName} @#{userName} #{ts} \"#{text}\"".magenta.bold
+        console.log "Received:".cyan.bold,
+            "#{type} #{channelName} @#{userName} #{ts} \"#{text}\"".magenta.bold
 
-    if channelName not in channelWhitelist then return
+        if channelName isnt allowedChannel then return
 
-    # if it's a useful message
-    if type is 'message' and text? and channel?
+        # if it's a useful message
+        if type is 'message' and text? and channel?
 
-        # TODO remove this after dev
-        updateGame(channel, userName, text)
+            # if it's a trigger to start a game
+            if text is trigger.acceptWord and pendingRequests[userName]?
 
-        # if it's a trigger to start a game
-        if text is trigger.acceptWord and pendingRequests[userName]?
+                request = pendingRequests[userName]
+                opponentName = request.userName
+                gridSize = request.gridSize
+                matchSize = request.matchSize
 
-            opponentName = pendingRequests[userName]
-
-            channel.send("
-                @#{userName} and @#{opponentName} are now slacking off!\n
-                When it's your turn just type the number of the column you want a ball dropped down.
-            ")
-            channel.send signoffMessage
-            gameInProgress = true
-            players.one = opponentName
-            players.two = userName
-            resetRequests()
-            printGameGrid(channel)
-
-        else if gameInProgress
-            if userName is players.one or userName is players.two
-                updateGame(channel, userName, text)
-            else
                 channel.send("
-                    sorry @#{userName}, @#{players.one} and @#{players.two} are already in a game.\n
-                    You could politely ask them to type in \"#{trigger.abortWord}\" and end the game early.
+                    @#{userName} and @#{opponentName} are now slacking off!\n
+                    When it's your turn just type the number of the column you want a ball dropped down.\n
+                    First to get #{matchSize} in a row is ze winzor.\n
                 ")
                 channel.send signoffMessage
+                startGame(channel, opponentName, userName)
 
-        else if text.match(trigger.startGame) and !gameInProgress
-
-            opponentName = trigger.startGame.exec(text)[2]
-
-            # if we have can find the opponent
-            if opponentName? and opponentName isnt userName
-                opponent = slack.getUserByName(opponentName)
-
-                if opponent?
-                    addRequest(opponentName, userName)
+            else if gameInProgress
+                if userName is players.one or userName is players.two
+                    updateGame(channel, userName, text)
+                else
                     channel.send("
-                        OK! Just waiting for @#{opponentName} to accept @#{userName}'s
-                        offer to slack off.\n
-                        @#{opponentName}, just type \"#{trigger.acceptWord}\" to accept.
+                        sorry @#{userName}, @#{players.one} and @#{players.two} are already in a game.
                     ")
                     channel.send signoffMessage
+
+            else if text.match(trigger.startGame) and !gameInProgress
+
+                console.error trigger.startGame.exec(text)
+
+                options = trigger.startGame.exec(text)
+                opponentName = options[1]
+                _gridSize = parseInt(options[3], 10)
+                _matchSize = parseInt(options[5], 10)
+
+                # handle game options and natural language error handling
+                console.error options[3], options[5]
+                if (
+                    !options[3]? or
+                    !options[5]?
+                )
+                    _gridSize = defaultGridSize
+                    _matchSize = defaultMatchSize
+
                 else
-                    channel.send("I couldn't find @#{opponentName} in this channel.")
-                    channel.send signoffMessage
+                    gridSizeError = ''
+                    matchSizeError = ''
 
-                # over and out
+                    if _gridSize < 4
+                        gridSizeError = 'smaller than 4'
+                    else if _gridSize > 10
+                        gridSizeError = 'bigger than 10'
 
 
-    else
-        #this one should probably be impossible, since we're in slack.on 'message'
-        typeError = if type isnt 'message' then "unexpected type #{type}." else null
-        #Can happen on delete/edit/a few other events
-        textError = if not text? then 'text was undefined.' else null
-        #In theory some events could happen with no channel
-        channelError = if not channel? then 'channel was undefined.' else null
+                    if _matchSize < 2
+                        matchSizeError = 'greater than 1'
+                    else if _matchSize >= _gridSize
+                        matchSizeError = 'less than the grid size'
 
-        #Space delimited string of my errors
-        errors = [typeError, textError, channelError].filter((element) -> element isnt null).join ' '
+                    error = "Hold up! "
 
-        console.log """
-      @#{slack.self.name} could not respond. #{errors}
-    """
+                    if gridSizeError isnt ''
+                        error += "We can't have a grid #{gridSizeError}"
+
+                    if matchSizeError isnt ''
+                        if gridSizeError
+                            error += ". Also, the match size must be #{matchSizeError}."
+                        else
+                            error += "The match size must be #{matchSizeError}."
+
+                    else
+                        error += '.'
+
+                    if gridSizeError or matchSizeError
+                        channel.send(error)
+                        channel.send(signoffMessage)
+                        return
+
+                # if we have can find the opponent
+                if opponentName? and opponentName isnt userName
+                    opponent = slack.getUserByName(opponentName)
+
+                    if opponent?
+                        addRequest(opponentName, userName, _gridSize, _matchSize)
+                        channel.send("
+                            OK! Just waiting for @#{opponentName} to accept @#{userName}'s
+                            offer to slack off.\n
+                            Size #{_gridSize}, match #{_matchSize}.\n
+                            @#{opponentName}, just type \"#{trigger.acceptWord}\" to accept.
+                        ")
+                        channel.send signoffMessage
+                    else
+                        channel.send("I couldn't find @#{opponentName} in this channel.")
+                        channel.send signoffMessage
+
+                    # over and out
+
+        else
+            #this one should probably be impossible, since we're in slack.on 'message'
+            typeError = if type isnt 'message' then "unexpected type #{type}." else null
+            #Can happen on delete/edit/a few other events
+            textError = if not text? then 'text was undefined.' else null
+            #In theory some events could happen with no channel
+            channelError = if not channel? then 'channel was undefined.' else null
+
+            #Space delimited string of my errors
+            errors = [typeError, textError, channelError].filter((element) -> element isnt null).join ' '
+
+            console.log """
+          @#{slack.self.name} could not respond. #{errors}
+        """
 
 
 slack.on 'error', (error) ->
