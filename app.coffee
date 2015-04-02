@@ -7,8 +7,8 @@ slack = new Slack(require('./authToken.coffee'), true, true)
 defaultGridSize = 5 #must be < 10 and > 4
 defaultMatchSize = 4 #must be < gridSize and > 1
 allowedChannel = '#slackerbots-crib'
-signoffMessage = ':sunglasses:'
-winningEmote = ':astonished:'
+signoffMessage = ':parkingduck:'
+winningEmote = ':awesomebatman:'
 trigger =
     startGame: /^slack off with (\S+)( size ([1-9]([0-9])?) match ([1-9]([0-9])?))?$/
     acceptWord: 'yes'
@@ -42,6 +42,8 @@ gameGrid = []
 pendingRequests = {}
 gridSize = 0
 matchSize = 0
+tileCount = 0
+ownedTileCount = 0
 
 # utility functions
 generateColumnNumbers = ->
@@ -78,9 +80,12 @@ endGame = ->
     winner = ''
     gridSize = 0
     matchSize = 0
+    tileCount = 0
+    ownedTileCount = 0
 
 resetGameGrid = =>
     gameGrid = []
+    tileCount = 0
     x = 0
     y = 0
     while y < gridSize
@@ -90,6 +95,7 @@ resetGameGrid = =>
             gameGrid[y][x] =
                 owner: ''
                 winningTile: false
+            tileCount++
             x++
         y++
 
@@ -99,6 +105,11 @@ printGameGrid = (channel) ->
         response = "
             Game over!\n
             @#{winner} is a bigger slacker than @#{loser}! #{winningEmote}\n
+        "
+    else if ownedTileCount is tileCount
+        response = "
+            It's a draw!\n
+            Maybe @#{players.one} and @#{players.two} are really the same person.\n
         "
     else
         response = "
@@ -153,7 +164,6 @@ updateGame = (channel, userName, col) ->
                         maxY <= gridSize - 1 and
                         minY >= 0
                     )
-                        console.error 'mod>', mod
                         # check if we've got a winner
                         _x = x
                         _y = y
@@ -161,16 +171,13 @@ updateGame = (channel, userName, col) ->
                         count = 0
                         tileRefs = []
                         while (targetIterations > 0)
-                            console.error 'checking', _x, _y
                             if gameGrid[_y][_x].owner is owner
-                                console.error '\tyep'
                                 count++
                                 tileRefs.push(gameGrid[_y][_x])
                             _x += mod[0]
                             _y += mod[1]
                             targetIterations--
 
-                        console.error '===='
                         # if we've got a winner
                         if count is matchSize
                             winner = owner
@@ -185,8 +192,11 @@ updateGame = (channel, userName, col) ->
 
                 if winner isnt ''
                     endGame()
+                else if ownedTileCount is tileCount
+                    endGame()
 
             addPiece = ->
+                ownedTileCount++
                 i = gameGrid.length + 1
                 if lastCoords? # don't do anything if the column is full
                     gameGrid[lastCoords.y][lastCoords.x].owner = userName
@@ -253,7 +263,7 @@ slack.on 'message', (message) ->
             else if gameInProgress
                 if userName is players.one or userName is players.two
                     updateGame(channel, userName, text)
-                else
+                else if text.match(trigger.startGame)
                     channel.send("
                         sorry @#{userName}, @#{players.one} and @#{players.two} are already in a game.
                     ")
