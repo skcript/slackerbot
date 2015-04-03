@@ -281,6 +281,11 @@ slack.on 'message', (message) ->
                 _gridSize = parseInt(options[3], 10)
                 _matchSize = parseInt(options[5], 10)
 
+                # decode user IDs
+                encodedUsernameMatch = opponentName.match(/^<@(\S+)>$/)
+                if encodedUsernameMatch
+                    opponentName = slack.getUserByID(encodedUsernameMatch[1]).name
+
                 # handle game options and natural language error handling
                 if (
                     !options[3]? or
