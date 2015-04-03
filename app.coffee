@@ -271,7 +271,7 @@ slack.on 'message', (message) ->
                 channel.send("
                     @#{userName} and @#{opponentName} are now slacking off!\n
                     When it's your turn just type the number of the column you want a ball dropped down.\n
-                    Type in \"#{trigger.abortWord} to leave the game at any time.\n
+                    Type in \"#{trigger.abortWord}\" to leave the game at any time.\n
                     First to get #{matchSize} in a row is ze winzor.\n
                 ")
                 channel.send signoffMessage
