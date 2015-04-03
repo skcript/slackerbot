@@ -1,0 +1,74 @@
+<html>
+    <head>
+        <title>Slackerbot - wjagodfrey.github.io</title>
+        <link rel="stylesheet" href="./node_modules/github-markdown-css/github-markdown.css">
+        <style>
+            .markdown-body {
+                min-width: 200px;
+                max-width: 790px;
+                margin: 0 auto;
+                padding: 30px;
+            }
+        </style>
+    </head>
+    <body>
+        <article class="markdown-body">
+            <h1>Slackerbot</h1>
+            <img src="./images/begin_game.png"/>
+            <hr>
+            <p>
+                <h2>Slackerbot is a bot for the slackers.</h2>
+                He hosts configurable connect-4 style games in slack channels.<br/>
+                Having a case of the Mondays? Slackerbot has your back!<br/>
+                Team disagreements? Battle it out with slackerbot!
+            </p>
+            <p>
+                <h2>To have your own slackerbot:</h2>
+                    <p>Download or clone him from <a href="http://github.com/wjagodfrey/slackerbot" target="_blank">github</a>.<p/>
+                    <pre>> npm install</pre>
+                    <pre>> npm install -g coffee-script</pre>
+                    <p>Configure the <em><strong>config.coffee</strong></em> file however you want.<p/>
+                    <p><a href="https://my.slack.com/services/new/bot" target="_blank">Make a new bot</a> and add it's auth token to the <em><strong>authToken.coffee</strong></em> file.</p>
+                    <pre>> coffee app.coffee</pre>
+                    <p>Invite your bot to the slack channel in it's <em><strong>config.coffee</strong></em>.</p>
+            </p>
+            <p>
+                <h2>How to use slackerbot:</h2>
+                <p>
+                    <em><strong>Slack off with *username*</strong></em><br/>
+                    &nbsp;&nbsp;- Asks the user if they want to jump into a game.<br/>
+                    &nbsp;&nbsp;- Default grid size is 5, match size is 4.
+                </p>
+                <p>
+                    <em><strong>Slack off with *username* size *number* match *number*</strong></em><br/>
+                    &nbsp;&nbsp;- Does the same as above, only defines the size of the grid and how many it's matching for.<br/>
+                    &nbsp;&nbsp;- Max grid size is <strong>10</strong>, min grid size is <strong>4</strong>.<br/>
+                    &nbsp;&nbsp;- Max match size must be less than the grid size and greater than 3.
+                </p>
+                <p>
+                    <em><strong>yes</strong></em><br/>
+                    &nbsp;&nbsp;- Accepts a game request.
+                </p>
+                <p>
+                    <em><strong>*number*</strong></em><br/>
+                    &nbsp;&nbsp;- If typed while in a game during a turn, will drop a token down that column.<br/>
+                    &nbsp;&nbsp;- Otherwise does nothing.
+                </p>
+                <p>
+                    <em><strong>quit</strong></em><br/>
+                    &nbsp;&nbsp;- If in a game, leaves a game.<br/>
+                    &nbsp;&nbsp;- Otherwise does nothing.
+                </p>
+            </p>
+            <br/>
+            <hr>
+            <p>
+                If you want to add more to him please feel free, send me your pull requests!
+            </p>
+            <p>
+                If you liked this, follow me on <a href="http://twitter.com/wjagodfrey" target="_blank">twitter</a>.<br/>
+                <em>Happy slacking!</em>
+            </p>
+        </article>
+    </body>
+</html>
