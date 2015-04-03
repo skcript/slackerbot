@@ -32,6 +32,7 @@ ownedTileCount = 0
 trigger =
     startGame: /^slack off with (\S+)( size ([1-9]([0-9])?) match ([1-9]([0-9])?))?$/
     acceptWord: 'yes'
+    abortWord: 'quit'
 tiles =
     empty: ':black_medium_small_square:'
     winning: ':sunny:'
@@ -134,12 +135,20 @@ printGameGrid = (channel) ->
                 response += tiles.empty
         response += '\n'
     channel.send(response)
-updateGame = (channel, userName, col) ->
+updateGame = (channel, userName, text) ->
 
-    if userName? and col? and userName is getCurrentPlayerName()
+    if text is trigger.abortWord
+        channel.send("
+            Game over!\n
+            @#{userName} was too much of a slacker to finish the game and gave up! #{winningEmote}
+        ")
+        endGame()
+        return
 
-        column = parseInt(col) - 1
-        if parseInt(col).toString() is col and column >= 0 and column <= gridSize - 1
+    if userName? and text? and userName is getCurrentPlayerName()
+
+        column = parseInt(text) - 1
+        if parseInt(text).toString() is text and column >= 0 and column <= gridSize - 1
 
             lastCoords = null
             i = 0
@@ -269,7 +278,8 @@ slack.on 'message', (message) ->
                     updateGame(channel, userName, text)
                 else if text.match(trigger.startGame)
                     channel.send("
-                        sorry @#{userName}, @#{players.one} and @#{players.two} are already in a game.
+                        Sorry @#{userName}, @#{players.one} and @#{players.two} are already in a game.\n
+                        You could ask one of them really nicely to type in \"#{trigger.abortWord}\" if they're taking too long.
                     ")
                     channel.send signoffMessage
 
