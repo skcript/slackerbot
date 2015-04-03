@@ -30,7 +30,7 @@ ownedTileCount = 0
 
 # utility variables
 trigger =
-    startGame: /^slack off with (\S+)( size ([1-9]([0-9])?) match ([1-9]([0-9])?))?$/
+    startGame: /^slack off with (\S+)( size ([1-9]([0-9])?) match ([1-9]([0-9])?))?$/i
     acceptWord: 'yes'
     abortWord: 'quit'
 tiles =
