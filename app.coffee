@@ -58,17 +58,22 @@ generateColumnNumbers = ->
     while (i <= gridSize - 1)
         columnHeaders += tiles.numbers[i]
         i++
+
 getCurrentPlayerName = ->
     if playerTwoTurn then players.two else players.one
+
 getCurrentPlayerTile = ->
     if playerTwoTurn then tiles.player2 else tiles.player1
+
 addRequest = (opponentName, userName, grid, match) ->
     pendingRequests[opponentName] =
         userName: userName
         gridSize: grid
         matchSize: match
+
 resetRequests = ->
     pendingRequests = {}
+
 startGame = (channel, player1, player2) ->
     gameInProgress = true
     players.one = player1
@@ -77,6 +82,7 @@ startGame = (channel, player1, player2) ->
     generateColumnNumbers()
     resetRequests()
     printGameGrid(channel)
+
 endGame = ->
     gameInProgress = false
     playerTwoTurn = false
@@ -113,7 +119,7 @@ printGameGrid = (channel) ->
         "
     else if ownedTileCount is tileCount
         response = "
-            It's a draw!\n
+            It's a draw! Game over!\n
             Maybe @#{players.one} and @#{players.two} are really the same person.\n
         "
     else
@@ -147,14 +153,13 @@ updateGame = (channel, userName, text) ->
 
     if userName? and text? and userName is getCurrentPlayerName()
 
-        column = parseInt(text) - 1
-        if parseInt(text).toString() is text and column >= 0 and column <= gridSize - 1
+        column = parseInt(text, 10) - 1
+        if parseInt(text, 10).toString() is text and column >= 0 and column <= gridSize - 1
 
             lastCoords = null
             i = 0
 
             checkForWinner = (x, y) ->
-
                 x = parseInt(x, 10)
                 y = parseInt(y, 10)
                 owner = userName
@@ -203,9 +208,7 @@ updateGame = (channel, userName, text) ->
                 printGameGrid(channel)
                 channel.send signoffMessage
 
-                if winner isnt ''
-                    endGame()
-                else if ownedTileCount is tileCount
+                if winner isnt '' or ownedTileCount is tileCount
                     endGame()
 
             addPiece = ->
@@ -268,6 +271,7 @@ slack.on 'message', (message) ->
                 channel.send("
                     @#{userName} and @#{opponentName} are now slacking off!\n
                     When it's your turn just type the number of the column you want a ball dropped down.\n
+                    Type in \"#{trigger.abortWord} to leave the game at any time.\n
                     First to get #{matchSize} in a row is ze winzor.\n
                 ")
                 channel.send signoffMessage
