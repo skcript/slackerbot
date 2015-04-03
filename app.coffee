@@ -275,7 +275,6 @@ slack.on 'message', (message) ->
 
             else if text.match(trigger.startGame) and !gameInProgress
 
-                console.error trigger.startGame.exec(text)
 
                 options = trigger.startGame.exec(text)
                 opponentName = options[1]
@@ -283,7 +282,6 @@ slack.on 'message', (message) ->
                 _matchSize = parseInt(options[5], 10)
 
                 # handle game options and natural language error handling
-                console.error options[3], options[5]
                 if (
                     !options[3]? or
                     !options[5]?
