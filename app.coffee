@@ -1,14 +1,34 @@
 require('colors')
+config = require('./config.coffee')
 Slack = require('slack-client')
 slack = new Slack(require('./authToken.coffee'), true, true)
 
 
 # static config
-defaultGridSize = 5 #must be < 10 and > 4
-defaultMatchSize = 4 #must be < gridSize and > 1
-allowedChannel = '#slackerbots-crib'
-signoffMessage = ':parkingduck:'
-winningEmote = ':awesomebatman:'
+{
+    defaultGridSize
+    defaultMatchSize
+    allowedChannel
+    signoffMessage
+    winningEmote
+} = config
+
+# bot state
+columnHeaders = ''
+gameInProgress = false
+playerTwoTurn = false
+winner = ''
+players =
+    one: ''
+    two: ''
+gameGrid = []
+pendingRequests = {}
+gridSize = 0
+matchSize = 0
+tileCount = 0
+ownedTileCount = 0
+
+# utility variables
 trigger =
     startGame: /^slack off with (\S+)( size ([1-9]([0-9])?) match ([1-9]([0-9])?))?$/
     acceptWord: 'yes'
@@ -29,21 +49,6 @@ tiles =
         ':nine:'
         ':keycap_ten:'
     ]
-
-# bot state
-columnHeaders = ''
-gameInProgress = false
-playerTwoTurn = false
-winner = ''
-players =
-    one: ''
-    two: ''
-gameGrid = []
-pendingRequests = {}
-gridSize = 0
-matchSize = 0
-tileCount = 0
-ownedTileCount = 0
 
 # utility functions
 generateColumnNumbers = ->
@@ -67,7 +72,6 @@ startGame = (channel, player1, player2) ->
     gameInProgress = true
     players.one = player1
     players.two = player2
-
     resetGameGrid()
     generateColumnNumbers()
     resetRequests()
